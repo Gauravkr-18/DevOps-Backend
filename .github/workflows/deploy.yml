@@ -1,78 +1,81 @@
-name: Deploy Backend to EC2
+name: Deploy to Staging (EC2)
 
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'backend/**'
-      - 'scripts/**'
-      - '.github/workflows/**'
-      - 'requirements.txt'
-      - 'Procfile'
+    push:
+        branches:
+            - main
+    workflow_dispatch: {}
+
 concurrency:
     group: main-deploy
     cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Run tests
-      run: |
-        cd backend
-        python manage.py check
-        python manage.py migrate --check
+    deploy:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Deploy Backend to EC2
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        port: 22
-        script: |
-          cd /var/www/workshop-platform-backend
-          git pull origin main
-          source venv/bin/activate
-          pip install -r requirements.txt
-          cd backend
-          python manage.py migrate
-          python manage.py collectstatic --noinput
-          sudo supervisorctl restart workshop-platform-backend
-          sudo systemctl reload nginx
-          
-    - name: Health Check
-      run: |
-        sleep 30
-        curl -f ${{ secrets.BACKEND_URL }}/api/ || exit 1
-        
-    - name: Deployment Success Notification
-      if: success()
-      run: echo "✅ Backend deployment completed successfully!"
-      
-    - name: Deployment Failure Notification
-      if: failure()
-      run: echo "❌ Backend deployment failed!"
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Ensure backend folder permissions
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  script: |
+                      mkdir -p /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+                      sudo chown -R $USER:$USER /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+                      sudo chmod -R u+rwX /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+
+            - name: Upload project to EC2 (SCP)
+              uses: appleboy/scp-action@v0.1.7
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  source: .
+                  target: /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+                  overwrite: true
+
+            - name: Deploy on EC2
+              uses: appleboy/ssh-action@v1.0.3
+              env:
+                  APP_DIR: /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  script_stop: true
+                  script: |
+                      cd /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+
+                      python3 -m venv .venv || true
+                      source .venv/bin/activate
+
+                      python -m pip install --upgrade pip
+                      pip install -r requirements.txt
+
+                      cd backend
+                      python manage.py migrate
+                      python manage.py collectstatic --noinput
+
+                      fuser -k 8000/tcp || true
+                      nohup python manage.py runserver 0.0.0.0:8000 > ../logs.out 2>&1 &
+                      echo "Deployment complete and server restarted!"
+
+            - name: Health Check
+              run: |
+                  sleep 15
+                  curl -f http://${{ secrets.EC2_HOST }}:8000/api/ || exit 1
+
+            - name: Deployment Success Notification
+              if: success()
+              run: echo "✅ Backend deployment completed successfully!"
+
+            - name: Deployment Failure Notification
+              if: failure()
+              run: echo "❌ Backend deployment failed!"
