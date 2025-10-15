@@ -62,15 +62,44 @@ jobs:
                       cd backend
                       python manage.py migrate
                       python manage.py collectstatic --noinput
+                      # Stop any existing dev server on 8000
+                      pkill -f "manage.py runserver" || true
 
-                      fuser -k 8000/tcp || true
-                      nohup python manage.py runserver 0.0.0.0:8000 > ../logs.out 2>&1 &
+                      # Start server
+                      echo "Python version: $(python --version)" || true
+                      which python || true
+                      nohup python manage.py runserver 0.0.0.0:8000 >> ../logs.out 2>&1 &
                       echo "Deployment complete and server restarted!"
+
+            - name: Verify server on EC2
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  script_stop: true
+                  script: |
+                      cd /home/${{ secrets.EC2_USER }}/workshop-platform-backend
+                      echo "Processes bound to :8000 (if any):"
+                      ss -ltnp | grep ":8000" || true
+                      echo "Runserver processes:"
+                      ps aux | grep -i "[m]anage.py runserver" || true
+                      echo "Last 100 lines of logs.out:"
+                      tail -n 100 logs.out || true
 
             - name: Health Check
               run: |
-                  sleep 15
-                  curl -f http://${{ secrets.EC2_HOST }}:8000/api/ || exit 1
+                  echo "Starting health check against EC2:${{ secrets.EC2_HOST }}:8000/api/"
+                  for i in {1..20}; do
+                      if curl -fsS http://${{ secrets.EC2_HOST }}:8000/api/ > /dev/null; then
+                          echo "Health check passed on attempt $i";
+                          exit 0;
+                      fi
+                      echo "Attempt $i failed. Waiting 5s before retry...";
+                      sleep 5;
+                  done
+                  echo "Health check failed after retries";
+                  exit 1
 
             - name: Deployment Success Notification
               if: success()
