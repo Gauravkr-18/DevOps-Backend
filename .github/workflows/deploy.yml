@@ -9,10 +9,9 @@ on:
       - '.github/workflows/**'
       - 'requirements.txt'
       - 'Procfile'
-  pull_request:
-    branches: [ main, master ]
-    paths:
-      - 'backend/**'
+concurrency:
+    group: main-deploy
+    cancel-in-progress: true
 
 jobs:
   test:
