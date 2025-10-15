@@ -123,6 +123,15 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+# Directory where collectstatic will put compiled assets (required for collectstatic)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Optional: Additional directories to look for static files during development
+# STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
