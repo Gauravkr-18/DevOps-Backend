@@ -154,17 +154,24 @@ else:
     # Production CORS settings
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [
-        # Add your S3 frontend URL
+        # Add your S3 frontend URL (both HTTP and HTTPS)
         "http://devops-frontend-1.s3-website.ap-south-1.amazonaws.com",
+        "https://devops-frontend-1.s3-website.ap-south-1.amazonaws.com",
     ]
     
     # Add S3 frontend URL
     frontend_url = os.environ.get('FRONTEND_URL')
     if frontend_url:
         CORS_ALLOWED_ORIGINS.append(frontend_url)
-        # Also allow HTTPS version
+        # Also allow both HTTP and HTTPS versions
         if frontend_url.startswith('http://'):
-            CORS_ALLOWED_ORIGINS.append(frontend_url.replace('http://', 'https://'))
+            https_url = frontend_url.replace('http://', 'https://')
+            if https_url not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(https_url)
+        elif frontend_url.startswith('https://'):
+            http_url = frontend_url.replace('https://', 'http://')
+            if http_url not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(http_url)
     
     # Add CloudFront URL
     cloudfront_url = os.environ.get('CLOUDFRONT_URL')
