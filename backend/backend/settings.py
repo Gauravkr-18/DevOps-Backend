@@ -18,7 +18,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-pro
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 # Allowed hosts - configure for both local and production
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['65.1.93.203']
 if DEBUG:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*']
 else:
