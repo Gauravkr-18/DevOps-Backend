@@ -18,11 +18,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-pro
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 # Allowed hosts - configure for both local and production
-ALLOWED_HOSTS = ['65.1.93.203']
+ALLOWED_HOSTS = ['65.1.93.203', 'localhost', '127.0.0.1']
 if DEBUG:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*']
 else:
     # Production hosts from environment variable
+    ALLOWED_HOSTS.extend(['65.1.93.203'])
     hosts = os.environ.get('ALLOWED_HOSTS', '')
     if hosts:
         ALLOWED_HOSTS = [host.strip() for host in hosts.split(',')]
@@ -137,33 +138,37 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings - Configure for both local and production
+# Always allow the S3 frontend
+CORS_ALLOWED_ORIGINS = [
+    "http://devops-frontend-1.s3-website.ap-south-1.amazonaws.com",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+
 if DEBUG:
     # Allow all origins in development
     CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ]
 else:
     # Production CORS settings
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = []
     
-    # Add S3 frontend URL
+    # Add S3 frontend URL from environment
     frontend_url = os.environ.get('FRONTEND_URL')
-    if frontend_url:
+    if frontend_url and frontend_url not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(frontend_url)
         # Also allow HTTPS version
         if frontend_url.startswith('http://'):
-            CORS_ALLOWED_ORIGINS.append(frontend_url.replace('http://', 'https://'))
+            https_url = frontend_url.replace('http://', 'https://')
+            if https_url not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(https_url)
     
     # Add CloudFront URL
     cloudfront_url = os.environ.get('CLOUDFRONT_URL')
-    if cloudfront_url:
+    if cloudfront_url and cloudfront_url not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(cloudfront_url)
 
 # CORS headers for all requests
