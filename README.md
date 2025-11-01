@@ -1,6 +1,6 @@
 # Workshop Platform Backend 🚀
 
-Django REST API backend for the Workshop Platform - a comprehensive system for managing technology workshops and course enrollments.
+ Django REST API backend for the Workshop Platform - a comprehensive system for managing technology workshops and course enrollments.
 
 ## 🏗️ Architecture
 
